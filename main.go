@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/gocarina/gocsv"
+	"github.com/gocarina/gocsv/v2"
 )
 
 type FASTA struct {
@@ -100,7 +100,7 @@ func main() {
 
 	flag.Parse()
 	if firstFile == nil || secondFile == nil || outFile == nil {
-		log.Fatal("Format is: first=filename.txt second=filename2.txt outfile=output.csv")
+		log.Fatal("Format is: -first=filename.txt -second=filename2.txt -outfile=output.csv")
 	}
 
 	fmt.Printf("FIRST FILE=%s SECOND FILE=%s", *firstFile, *secondFile)
