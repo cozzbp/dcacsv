@@ -16,17 +16,19 @@ import (
 
 type FASTA struct {
 	ShortName string  `csv:"ShortName"`
-	Organism  string  `csv:"Organism"`
+	Organism1 string  `csv:"Organism1"`
 	Hit1      float64 `csv:"PERCENTIDENT1"`
 	File1     string  `csv:"FILE1"`
+	Organism2 string  `csv:"Organism2"`
 	Hit2      float64 `csv:"PERCENTIDENT2"`
 	File2     string  `csv:"FILE2"`
 }
 
 type Sequence struct {
-	Sequence string
-	Full     string
-	Hit      float64
+	OrganismName string
+	Sequence     string
+	Full         string
+	Hit          float64
 }
 
 func check(e error) {
@@ -34,8 +36,6 @@ func check(e error) {
 		panic(e)
 	}
 }
-
-const PERCENT_THRESHOLD = 50.0
 
 func GetStringInBetween(str string, start string, end string) (result string) {
 	s := strings.Index(str, start)
@@ -113,11 +113,8 @@ func buildMap(fileName, hitFile string) map[string]Sequence {
 		accession := strings.Split(field, " ")[0]
 		hitPercent := hitMap[accession]
 
-		if hitPercent < PERCENT_THRESHOLD {
-			continue
-		}
-
 		name := GetStringInBetween(field, "[", "]")
+		strippedName := getStrippedName(name)
 
 		seqs := strings.Split(field, "]")
 		if len(seqs) < 2 {
@@ -125,19 +122,21 @@ func buildMap(fileName, hitFile string) map[string]Sequence {
 		}
 		seq := seqs[1]
 
-		existing, ok := mapped[name]
+		existing, ok := mapped[strippedName]
 		if !ok {
-			mapped[name] = Sequence{
-				Sequence: seq,
-				Full:     field,
-				Hit:      hitPercent,
+			mapped[strippedName] = Sequence{
+				OrganismName: name,
+				Sequence:     seq,
+				Full:         field,
+				Hit:          hitPercent,
 			}
 		} else {
 			if hitPercent > existing.Hit {
-				mapped[name] = Sequence{
-					Sequence: seq,
-					Full:     field,
-					Hit:      hitPercent,
+				mapped[strippedName] = Sequence{
+					OrganismName: name,
+					Sequence:     seq,
+					Full:         field,
+					Hit:          hitPercent,
 				}
 			}
 		}
@@ -184,10 +183,11 @@ func main() {
 		if ok {
 			count++
 			fastas = append(fastas, &FASTA{
-				Organism:  k,
-				ShortName: getStrippedName(k),
+				ShortName: k,
+				Organism1: v.OrganismName,
 				File1:     v.Full,
 				Hit1:      v.Hit,
+				Organism2: sv.OrganismName,
 				File2:     sv.Full,
 				Hit2:      sv.Hit,
 			})
