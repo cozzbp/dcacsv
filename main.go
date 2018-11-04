@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,11 +15,12 @@ import (
 )
 
 type FASTA struct {
-	Organism string  `csv:"Organism"`
-	Hit1     float64 `csv:"PERCENTIDENT1"`
-	File1    string  `csv:"FILE1"`
-	Hit2     float64 `csv:"PERCENTIDENT2"`
-	File2    string  `csv:"FILE2"`
+	ShortName string  `csv:"ShortName"`
+	Organism  string  `csv:"Organism"`
+	Hit1      float64 `csv:"PERCENTIDENT1"`
+	File1     string  `csv:"FILE1"`
+	Hit2      float64 `csv:"PERCENTIDENT2"`
+	File2     string  `csv:"FILE2"`
 }
 
 type Sequence struct {
@@ -32,6 +34,8 @@ func check(e error) {
 		panic(e)
 	}
 }
+
+const PERCENT_THRESHOLD = 50.0
 
 func GetStringInBetween(str string, start string, end string) (result string) {
 	s := strings.Index(str, start)
@@ -65,6 +69,25 @@ func buildHitMap(fileName string) map[string]float64 {
 	return hitMap
 }
 
+func getStrippedName(name string) string {
+	r, err := regexp.Compile(".*[A-Z].*|\\d")
+	check(err)
+
+	nameWords := strings.Split(name, " ")
+	finalName := ""
+	for i, word := range nameWords {
+		if i == 0 {
+			finalName = word
+		} else if !r.MatchString(word) {
+			finalName += " " + word
+		} else {
+			break
+		}
+	}
+
+	return finalName
+}
+
 func buildMap(fileName, hitFile string) map[string]Sequence {
 	dat, err := ioutil.ReadFile(fileName)
 	check(err)
@@ -86,7 +109,14 @@ func buildMap(fileName, hitFile string) map[string]Sequence {
 		if strings.Index(field, "partial") != -1 {
 			continue
 		}
+
 		accession := strings.Split(field, " ")[0]
+		hitPercent := hitMap[accession]
+
+		if hitPercent < PERCENT_THRESHOLD {
+			continue
+		}
+
 		name := GetStringInBetween(field, "[", "]")
 
 		seqs := strings.Split(field, "]")
@@ -100,14 +130,14 @@ func buildMap(fileName, hitFile string) map[string]Sequence {
 			mapped[name] = Sequence{
 				Sequence: seq,
 				Full:     field,
-				Hit:      hitMap[accession],
+				Hit:      hitPercent,
 			}
 		} else {
-			if hitMap[accession] > existing.Hit {
+			if hitPercent > existing.Hit {
 				mapped[name] = Sequence{
 					Sequence: seq,
 					Full:     field,
-					Hit:      hitMap[accession],
+					Hit:      hitPercent,
 				}
 			}
 		}
@@ -154,11 +184,12 @@ func main() {
 		if ok {
 			count++
 			fastas = append(fastas, &FASTA{
-				Organism: k,
-				File1:    v.Full,
-				Hit1:     v.Hit,
-				File2:    sv.Full,
-				Hit2:     sv.Hit,
+				Organism:  k,
+				ShortName: getStrippedName(k),
+				File1:     v.Full,
+				Hit1:      v.Hit,
+				File2:     sv.Full,
+				Hit2:      sv.Hit,
 			})
 		}
 	}
